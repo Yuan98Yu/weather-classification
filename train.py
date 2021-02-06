@@ -55,8 +55,8 @@ def fit_one_cycle(epochs,
     # Set up cutom optimizer with weight decay
     optimizer = opt_func(model.parameters(), max_lr, weight_decay=weight_decay)
     # Set up one-cycle learning rate scheduler
-    sched = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr, epochs=epochs, steps_per_epoch=len(train_loader))
+    # sched = torch.optim.lr_scheduler.OneCycleLR(
+    #     optimizer, max_lr, epochs=epochs, steps_per_epoch=len(train_loader))
 
     for epoch in range(epochs):
         # Training Phase
@@ -77,7 +77,7 @@ def fit_one_cycle(epochs,
 
             # Record & update learning rate
             lrs.append(get_lr(optimizer))
-            sched.step()
+            # sched.step()
 
         # Validation phase
         result = evaluate(model, val_loader)
