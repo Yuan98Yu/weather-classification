@@ -1,8 +1,11 @@
+import os
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 import torchvision.transforms as tt
 from torchvision.datasets import ImageFolder
+from tensorboardX import SummaryWriter
 
 from data import DeviceDataLoader, data_dir, show_batch, device, to_device
 from net import WeatherModel1
@@ -41,7 +44,8 @@ def get_lr(optimizer):
         return param_group['lr']
 
 
-def fit_one_cycle(epochs,
+def fit_one_cycle(writer,
+                  epochs,
                   max_lr,
                   model,
                   train_loader,
@@ -88,9 +92,8 @@ def fit_one_cycle(epochs,
     return history
 
 
-def main():
+def main(writer: SummaryWriter):
     # some data transforms and augmentation to improve accuracy
-
     stats = ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     # set the batch size
     batch_size = 64
@@ -137,7 +140,8 @@ def main():
 
     history = [evaluate(model, valid_dl)]
 
-    history += fit_one_cycle(epochs,
+    history += fit_one_cycle(writer,
+                             epochs,
                              max_lr,
                              model,
                              train_dl,
@@ -176,6 +180,20 @@ def main():
     plt.title('Learning Rate vs. Batch no.')
     plt.show()
 
+    torch.save(model, os.path.join(writer.logdir, 'model.ckpt'))
+
 
 if __name__ == '__main__':
-    main()
+    exps_root = 'runs'
+    exp_id = 'exp-1'
+    writer = SummaryWriter(os.path.join(exps_root, exp_id))
+
+    cfg = {
+        'data_dir': data_dir,
+        'epochs': 15,
+        'max_lr': 3e-4,
+        'grad_clip': 0.1,
+        'weight_decay': 1e-4
+    }
+    torch.save(cfg, os.path.join(writer.logdir, 'cfg'))
+    main(writer)
