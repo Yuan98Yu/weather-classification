@@ -1,5 +1,6 @@
 data
 runs
+nohup.out
 
 .pytest_cache
 .vscode

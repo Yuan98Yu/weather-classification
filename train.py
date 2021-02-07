@@ -1,4 +1,6 @@
 import os
+from argparse import ArgumentParser
+from typing import Dict
 
 import torch
 from torch import nn
@@ -6,9 +8,12 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as tt
 from torchvision.datasets import ImageFolder
 from tensorboardX import SummaryWriter
+import numpy as np
+import matplotlib.pyplot as plt
 
-from data import DeviceDataLoader, data_dir, show_batch, device, to_device
+from data import DeviceDataLoader, get_default_device, to_device
 from net import WeatherModel1
+import config
 
 
 @torch.no_grad()
@@ -45,6 +50,7 @@ def get_lr(optimizer):
 
 
 def fit_one_cycle(writer,
+                  start_epoch,
                   epochs,
                   max_lr,
                   model,
@@ -59,10 +65,12 @@ def fit_one_cycle(writer,
     # Set up cutom optimizer with weight decay
     optimizer = opt_func(model.parameters(), max_lr, weight_decay=weight_decay)
     # Set up one-cycle learning rate scheduler
-    # sched = torch.optim.lr_scheduler.OneCycleLR(
-    #     optimizer, max_lr, epochs=epochs, steps_per_epoch=len(train_loader))
+    sched = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr, epochs=epochs, steps_per_epoch=len(train_loader))
+    # last_epoch = -1 if start_epoch == 0 else start_epoch
+    # sched = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9, last_epoch=last_epoch)
 
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs):
         # Training Phase
         model.train()
         train_losses = []
@@ -81,18 +89,20 @@ def fit_one_cycle(writer,
 
             # Record & update learning rate
             lrs.append(get_lr(optimizer))
-            # sched.step()
+            sched.step()
 
         # Validation phase
         result = evaluate(model, val_loader)
         result['train_loss'] = torch.stack(train_losses).mean().item()
         result['lrs'] = lrs
-        model.epoch_end(epoch, result)
+        model.epoch_end(epoch, result, writer)
         history.append(result)
+        if epoch % 10 == 0:
+            torch.save(model.state_dict(), os.path.join(writer.logdir, f'model_epoch{epoch}.ckpt'))
     return history
 
 
-def main(writer: SummaryWriter):
+def main(writer: SummaryWriter, cfg: Dict):
     # some data transforms and augmentation to improve accuracy
     stats = ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     # set the batch size
@@ -109,11 +119,12 @@ def main(writer: SummaryWriter):
          tt.Normalize(*stats)])
 
     # Create datasets
-    train_ds = ImageFolder(data_dir, train_transform)
+    train_ds = ImageFolder(cfg['data_dir'], train_transform)
     classes = train_ds.classes
     print(classes)
     num_classes = len(classes)
-    train_ds, valid_ds = torch.utils.data.random_split(train_ds, [50000, 10000])
+    train_ds, valid_ds = torch.utils.data.random_split(train_ds,
+                                                       [50000, 10000])
 
     test_ds = valid_ds
     train_dl = DeviceDataLoader(
@@ -121,26 +132,34 @@ def main(writer: SummaryWriter):
                    batch_size,
                    shuffle=True,
                    num_workers=3,
-                   pin_memory=True), device)
+                   pin_memory=True), cfg['device'])
     valid_dl = DeviceDataLoader(
         DataLoader(valid_ds, batch_size * 2, num_workers=2, pin_memory=True),
-        device)
+        cfg['device'])
 
-    show_batch(train_dl)
+    # show_batch(train_dl)
 
     # model
-    model = to_device(WeatherModel1(num_classes), device)
+    start_epoch = 0
+    model = to_device(WeatherModel1(num_classes, cfg['pretrained_model']),
+                      cfg['device'])
+    if cfg['ckpt']:
+        model_ckpt = torch.load(os.path.join(writer.logdir, cfg['ckpt']))
+        model.load_state_dict(model_ckpt)
+        import re
+        start_epoch = int(re.search(r'epoch(\d+)', cfg['ckpt']).group(0)[5:]) + 1
 
     # train & val
-    epochs = 15
-    max_lr = 3e-4
-    grad_clip = 0.1
-    weight_decay = 1e-4
+    epochs = cfg['epochs']
+    max_lr = cfg['max_lr']
+    grad_clip = cfg['grad_clip']
+    weight_decay = cfg['weight_decay']
     opt_func = torch.optim.Adam
 
     history = [evaluate(model, valid_dl)]
 
     history += fit_one_cycle(writer,
+                             start_epoch,
                              epochs,
                              max_lr,
                              model,
@@ -151,9 +170,6 @@ def main(writer: SummaryWriter):
                              opt_func=opt_func)
 
     # plot accuracy
-    import numpy as np
-    import matplotlib.pyplot as plt
-
     accuracies = [x['val_acc'] for x in history]
     plt.plot(accuracies, '-x')
     plt.xlabel('epoch')
@@ -180,20 +196,30 @@ def main(writer: SummaryWriter):
     plt.title('Learning Rate vs. Batch no.')
     plt.show()
 
-    torch.save(model, os.path.join(writer.logdir, 'model.ckpt'))
+    torch.save(model.state_dict(), os.path.join(writer.logdir, 'model.ckpt'))
 
 
 if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument('--cfg', type=str, default='res34')
+    parser.add_argument('--gpu', type=str, default='1')
+    parser.add_argument('--ckpt', type=str, default=None)
+    parser.add_argument('--seed', type=int, default=1)
+    args = parser.parse_args()
+    cfg = getattr(config, args.cfg)
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    cfg['device'] = get_default_device()
+    cfg['exp_id'] = f'exp-{args.cfg}'
+    cfg['ckpt'] = args.ckpt
+
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+
     exps_root = 'runs'
-    exp_id = 'exp-1'
+    exp_id = cfg['exp_id']
     writer = SummaryWriter(os.path.join(exps_root, exp_id))
 
-    cfg = {
-        'data_dir': data_dir,
-        'epochs': 15,
-        'max_lr': 3e-4,
-        'grad_clip': 0.1,
-        'weight_decay': 1e-4
-    }
     torch.save(cfg, os.path.join(writer.logdir, 'cfg'))
-    main(writer)
+
+    main(writer, cfg)

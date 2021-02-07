@@ -8,7 +8,8 @@ data_dir = './data'
 def show_batch(dl):
     for images, labels in dl:
         fig, ax = plt.subplots(figsize=(12, 12))
-        ax.set_xticks([]); ax.set_yticks([])
+        ax.set_xticks([])
+        ax.set_yticks([])
         ax.imshow(make_grid(images.cpu()[:64], nrow=8).permute(1, 2, 0))
         plt.show()
         break
@@ -46,6 +47,3 @@ class DeviceDataLoader():
     def __len__(self):
         """Number of batches"""
         return len(self.dl)
-
-
-device = get_default_device()
