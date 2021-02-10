@@ -1,4 +1,61 @@
+import torchvision.transforms as tt
+from torchvision.transforms.transforms import ColorJitter, Compose, RandomApply, RandomRotation, RandomVerticalFlip
+
+
 data_dir = './data'
+
+stats = ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+train_transform1 = tt.Compose([
+    tt.RandomResizedCrop([200, 200]),
+    tt.RandomHorizontalFlip(),
+    tt.RandomVerticalFlip(),
+    tt.RandomRotation(90),
+    tt.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+    tt.ToTensor(),
+    tt.Normalize(*stats)
+])
+
+res34_e181_explr_tt1_model2 = {
+    'data_dir': data_dir,
+    'epochs': 181,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'resnet34',
+    'train_transform': train_transform1,
+    'model': 'WeatherModel2'
+}
+
+res34_e181_explr_tt1 = {
+    'data_dir': data_dir,
+    'epochs': 181,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'resnet34',
+    'train_transform': train_transform1
+}
+
+res50_e181_explr_tt1 = {
+    'data_dir': data_dir,
+    'epochs': 181,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'resnet50',
+    'train_transform': train_transform1
+}
+
+res101_e181_explr_tt1 = {
+    'data_dir': data_dir,
+    'epochs': 181,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'resnet101',
+    'train_transform': train_transform1
+}
 
 res34 = {
     'exp_id': 'exp-res34-1',

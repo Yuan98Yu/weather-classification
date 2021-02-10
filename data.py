@@ -2,8 +2,6 @@ import torch
 from torchvision.utils import make_grid
 from matplotlib import pyplot as plt
 
-data_dir = './data'
-
 
 def show_batch(dl):
     for images, labels in dl:

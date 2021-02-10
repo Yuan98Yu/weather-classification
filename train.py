@@ -1,6 +1,7 @@
 import os
 from argparse import ArgumentParser
 from typing import Dict
+from copy import copy
 
 import torch
 from torch import nn
@@ -12,6 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from data import DeviceDataLoader, get_default_device, to_device
+import net
 from net import WeatherModel1
 import config
 
@@ -65,10 +67,10 @@ def fit_one_cycle(writer,
     # Set up cutom optimizer with weight decay
     optimizer = opt_func(model.parameters(), max_lr, weight_decay=weight_decay)
     # Set up one-cycle learning rate scheduler
-    sched = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer, max_lr, epochs=epochs, steps_per_epoch=len(train_loader))
-    # last_epoch = -1 if start_epoch == 0 else start_epoch
-    # sched = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9, last_epoch=last_epoch)
+    # sched = torch.optim.lr_scheduler.OneCycleLR(
+    #     optimizer, max_lr, epochs=epochs, steps_per_epoch=len(train_loader))
+    last_epoch = -1 if start_epoch == 0 else start_epoch
+    sched = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95, last_epoch=last_epoch)
 
     for epoch in range(start_epoch, epochs):
         # Training Phase
@@ -87,9 +89,9 @@ def fit_one_cycle(writer,
             optimizer.step()
             optimizer.zero_grad()
 
-            # Record & update learning rate
-            lrs.append(get_lr(optimizer))
-            sched.step()
+        # Record & update learning rate
+        lrs.append(get_lr(optimizer))
+        sched.step()
 
         # Validation phase
         result = evaluate(model, val_loader)
@@ -108,25 +110,30 @@ def main(writer: SummaryWriter, cfg: Dict):
     # set the batch size
     batch_size = 64
 
-    train_transform = tt.Compose([
-        tt.RandomCrop(200, padding=20, padding_mode='reflect'),
-        tt.RandomHorizontalFlip(),
-        tt.ToTensor(),
-        tt.Normalize(*stats),
-    ])
+    train_transform = cfg['train_transform']
+
+    # train_transform = tt.Compose([
+    #     tt.RandomCrop(200, padding=20, padding_mode='reflect'),
+    #     tt.RandomHorizontalFlip(),
+    #     tt.ToTensor(),
+    #     tt.Normalize(*stats)
+    # ])
     valid_transform = tt.Compose(
-        [tt.Resize(200), tt.ToTensor(),
+        [tt.Resize([200, 200]), tt.ToTensor(),
          tt.Normalize(*stats)])
 
     # Create datasets
-    train_ds = ImageFolder(cfg['data_dir'], train_transform)
-    classes = train_ds.classes
+    full_dataset = ImageFolder(cfg['data_dir'])
+    classes = full_dataset.classes
     print(classes)
     num_classes = len(classes)
-    train_ds, valid_ds = torch.utils.data.random_split(train_ds,
+    train_ds, valid_ds = torch.utils.data.random_split(full_dataset,
                                                        [50000, 10000])
+    train_ds.dataset = copy(full_dataset)
+    train_ds.dataset.transform = train_transform
+    valid_ds.dataset.transform = valid_transform
 
-    test_ds = valid_ds
+    # test_ds = valid_ds
     train_dl = DeviceDataLoader(
         DataLoader(train_ds,
                    batch_size,
@@ -141,6 +148,7 @@ def main(writer: SummaryWriter, cfg: Dict):
 
     # model
     start_epoch = 0
+    model = getattr(net, cfg['model'])
     model = to_device(WeatherModel1(num_classes, cfg['pretrained_model']),
                       cfg['device'])
     if cfg['ckpt']:
@@ -206,15 +214,16 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt', type=str, default=None)
     parser.add_argument('--seed', type=int, default=1)
     args = parser.parse_args()
-    cfg = getattr(config, args.cfg)
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
-    cfg['device'] = get_default_device()
-    cfg['exp_id'] = f'exp-{args.cfg}'
-    cfg['ckpt'] = args.ckpt
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
+
+    cfg = getattr(config, args.cfg)
+    cfg['device'] = get_default_device()
+    cfg['exp_id'] = f'exp-{args.cfg}'
+    cfg['ckpt'] = args.ckpt
 
     exps_root = 'runs'
     exp_id = cfg['exp_id']
