@@ -8,7 +8,7 @@ trainingServicePlatform: local
 localConfig:
   useActiveGpu: true
   maxTrialNumPerGpu: 1
-searchSpacePath: ./nni_config/search_space.json
+searchSpacePath: ./search_space.json
 #choice: true, false
 useAnnotation: false
 tuner:
@@ -20,5 +20,5 @@ tuner:
     optimize_mode: maximize
 trial:
   command: python train.py --cfg res34_e81_b64_explr_tt1_model2_freeze --gpu 0,1,2,3 --seed 1
-  codeDir: ./
+  codeDir: ../
   gpuNum: 1

@@ -2,8 +2,8 @@
     "batch_size": {
         "_type": "choice",
         "_value": [
-            64,
-            128
+            128,
+            256
         ]
     },
     "freeze": {

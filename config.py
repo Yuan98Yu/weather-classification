@@ -16,6 +16,19 @@ tt1 = tt.Compose([
     tt.Normalize(*stats)
 ])
 
+res34_e81_b64_explr_tt1_model2_freeze = {
+    'data_dir': data_dir,
+    'epochs': 81,
+    'batch_size': 64,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'resnet34',
+    'train_transform': 'tt1',
+    'model': 'WeatherModel2',
+    'freeze': True
+}
+
 res34_e181_b64_explr_tt1_model1_freeze = {
     'data_dir': data_dir,
     'epochs': 181,
