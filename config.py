@@ -6,7 +6,7 @@ data_dir = './data'
 
 stats = ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 
-train_transform1 = tt.Compose([
+tt1 = tt.Compose([
     tt.RandomResizedCrop([200, 200]),
     tt.RandomHorizontalFlip(),
     tt.RandomVerticalFlip(),
@@ -16,6 +16,19 @@ train_transform1 = tt.Compose([
     tt.Normalize(*stats)
 ])
 
+res34_e181_b64_explr_tt1_model1_freeze = {
+    'data_dir': data_dir,
+    'epochs': 181,
+    'batch_size': 64,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'resnet34',
+    'train_transform': 'tt1',
+    'model': 'WeatherModel1',
+    'freeze': True
+}
+
 res34_e181_explr_tt1_model2 = {
     'data_dir': data_dir,
     'epochs': 181,
@@ -23,7 +36,7 @@ res34_e181_explr_tt1_model2 = {
     'grad_clip': 0.1,
     'weight_decay': 1e-4,
     'pretrained_model': 'resnet34',
-    'train_transform': train_transform1,
+    'train_transform': 'tt1',
     'model': 'WeatherModel2'
 }
 
@@ -34,7 +47,7 @@ res34_e181_explr_tt1 = {
     'grad_clip': 0.1,
     'weight_decay': 1e-4,
     'pretrained_model': 'resnet34',
-    'train_transform': train_transform1
+    'train_transform': 'tt1'
 }
 
 res50_e181_explr_tt1 = {
@@ -44,7 +57,7 @@ res50_e181_explr_tt1 = {
     'grad_clip': 0.1,
     'weight_decay': 1e-4,
     'pretrained_model': 'resnet50',
-    'train_transform': train_transform1
+    'train_transform': 'tt1'
 }
 
 res101_e181_explr_tt1 = {
@@ -54,7 +67,7 @@ res101_e181_explr_tt1 = {
     'grad_clip': 0.1,
     'weight_decay': 1e-4,
     'pretrained_model': 'resnet101',
-    'train_transform': train_transform1
+    'train_transform': 'tt1'
 }
 
 res34 = {

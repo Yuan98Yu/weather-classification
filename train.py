@@ -3,6 +3,8 @@ from argparse import ArgumentParser
 from typing import Dict
 from copy import copy
 
+import nni
+from nni.utils import merge_parameter
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
@@ -70,7 +72,9 @@ def fit_one_cycle(writer,
     # sched = torch.optim.lr_scheduler.OneCycleLR(
     #     optimizer, max_lr, epochs=epochs, steps_per_epoch=len(train_loader))
     last_epoch = -1 if start_epoch == 0 else start_epoch
-    sched = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95, last_epoch=last_epoch)
+    sched = torch.optim.lr_scheduler.ExponentialLR(optimizer,
+                                                   gamma=0.95,
+                                                   last_epoch=last_epoch)
 
     for epoch in range(start_epoch, epochs):
         # Training Phase
@@ -95,12 +99,15 @@ def fit_one_cycle(writer,
 
         # Validation phase
         result = evaluate(model, val_loader)
+        nni.report_intermediate_result(result['val_acc'])
         result['train_loss'] = torch.stack(train_losses).mean().item()
         result['lrs'] = lrs
         model.epoch_end(epoch, result, writer)
         history.append(result)
         if epoch % 10 == 0:
-            torch.save(model.state_dict(), os.path.join(writer.logdir, f'model_epoch{epoch}.ckpt'))
+            torch.save(model.state_dict(),
+                       os.path.join(writer.logdir, f'model_epoch{epoch}.ckpt'))
+    nni.report_final_result(history[-1]['val_acc'])
     return history
 
 
@@ -108,9 +115,9 @@ def main(writer: SummaryWriter, cfg: Dict):
     # some data transforms and augmentation to improve accuracy
     stats = ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     # set the batch size
-    batch_size = 64
+    batch_size = cfg['batch_size']
 
-    train_transform = cfg['train_transform']
+    train_transform = getattr(config, cfg['train_transform'])
 
     # train_transform = tt.Compose([
     #     tt.RandomCrop(200, padding=20, padding_mode='reflect'),
@@ -119,7 +126,8 @@ def main(writer: SummaryWriter, cfg: Dict):
     #     tt.Normalize(*stats)
     # ])
     valid_transform = tt.Compose(
-        [tt.Resize([200, 200]), tt.ToTensor(),
+        [tt.Resize([200, 200]),
+         tt.ToTensor(),
          tt.Normalize(*stats)])
 
     # Create datasets
@@ -151,11 +159,14 @@ def main(writer: SummaryWriter, cfg: Dict):
     model = getattr(net, cfg['model'])
     model = to_device(WeatherModel1(num_classes, cfg['pretrained_model']),
                       cfg['device'])
+    if cfg['freeze']:
+        model.freeze()
     if cfg['ckpt']:
         model_ckpt = torch.load(os.path.join(writer.logdir, cfg['ckpt']))
         model.load_state_dict(model_ckpt)
         import re
-        start_epoch = int(re.search(r'epoch(\d+)', cfg['ckpt']).group(0)[5:]) + 1
+        start_epoch = int(re.search(r'epoch(\d+)',
+                                    cfg['ckpt']).group(0)[5:]) + 1
 
     # train & val
     epochs = cfg['epochs']
@@ -215,20 +226,45 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=1)
     args = parser.parse_args()
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+    # os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >tmp')
+    # memory_gpu = [int(x.split()[2]) for x in open('tmp', 'r').readlines()]
+    # os.environ['CUDA_VISIBLE_DEVICES'] = str(np.argmax(memory_gpu))
+    # os.system('rm tmp')
+    # import pynvml
+    # import time
+    # import random
+    # pynvml.nvmlInit()
+    # time.sleep(random.random()*10)
+    # for index in range(pynvml.nvmlDeviceGetCount()):
+    #     # 这里的0是GPU id
+
+    #     handle = pynvml.nvmlDeviceGetHandleByIndex(index)
+    #     meminfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
+    #     used = meminfo.used / meminfo.total
+    #     if used < 0.1:
+    #         os.environ["CUDA_VISIBLE_DEVICES"] = f'{index}'
+    #         break
+
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
 
     cfg = getattr(config, args.cfg)
-    cfg['device'] = get_default_device()
-    cfg['exp_id'] = f'exp-{args.cfg}'
-    cfg['ckpt'] = args.ckpt
+    try:
+        tuner_params = nni.get_next_parameter()
+        # cfg = vars(merge_parameter(cfg, tuner_params))
+        cfg.update(tuner_params)
+        cfg['device'] = get_default_device()
+        cfg['exp_id'] = f'exp-{cfg["pretrained_model"]}_e{cfg["epochs"]}_b{cfg["batch_size"]}_{cfg["train_transform"]}_explr_{cfg["model"]}_{"freeze" if cfg["freeze"] else "unfreeze"}'
+        cfg['ckpt'] = args.ckpt
 
-    exps_root = 'runs'
-    exp_id = cfg['exp_id']
-    writer = SummaryWriter(os.path.join(exps_root, exp_id))
+        exps_root = 'runs'
+        exp_id = cfg['exp_id']
+        writer = SummaryWriter(os.path.join(exps_root, exp_id))
 
-    torch.save(cfg, os.path.join(writer.logdir, 'cfg'))
+        torch.save(cfg, os.path.join(writer.logdir, 'cfg'))
 
-    main(writer, cfg)
+        main(writer, cfg)
+    except Exception as exception:
+        print(exception)
+        raise
