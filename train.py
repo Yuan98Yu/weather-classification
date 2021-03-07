@@ -4,19 +4,18 @@ from typing import Dict
 from copy import copy
 
 import nni
-from nni.utils import merge_parameter
+# from nni.utils import merge_parameter
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
-import torchvision.transforms as tt
+# import torchvision.transforms as tt
 from torchvision.datasets import ImageFolder
 from tensorboardX import SummaryWriter
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-from data import DeviceDataLoader, get_default_device, to_device
-import net
-from net import WeatherModel1
+from data import DeviceDataLoader, get_default_device, show_batch
+from net import create_model
 import config
 
 
@@ -62,7 +61,8 @@ def fit_one_cycle(writer,
                   val_loader,
                   weight_decay=0,
                   grad_clip=None,
-                  opt_func=torch.optim.SGD):
+                  opt_func=torch.optim.SGD,
+                  accumulation_steps=16):
     torch.cuda.empty_cache()
     history = []
 
@@ -81,7 +81,7 @@ def fit_one_cycle(writer,
         model.train()
         train_losses = []
         lrs = []
-        for batch in train_loader:
+        for i, batch in enumerate(train_loader):
             loss = model.training_step(batch)
             train_losses.append(loss)
             loss.backward()
@@ -90,8 +90,9 @@ def fit_one_cycle(writer,
             if grad_clip:
                 nn.utils.clip_grad_value_(model.parameters(), grad_clip)
 
-            optimizer.step()
-            optimizer.zero_grad()
+            if i % accumulation_steps == 0 or i == len(train_loader) - 1:
+                optimizer.step()
+                optimizer.zero_grad()
 
         # Record & update learning rate
         lrs.append(get_lr(optimizer))
@@ -113,7 +114,7 @@ def fit_one_cycle(writer,
 
 def main(writer: SummaryWriter, cfg: Dict):
     # some data transforms and augmentation to improve accuracy
-    stats = ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    # stats = ((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     # set the batch size
     batch_size = cfg['batch_size']
 
@@ -125,13 +126,15 @@ def main(writer: SummaryWriter, cfg: Dict):
     #     tt.ToTensor(),
     #     tt.Normalize(*stats)
     # ])
-    valid_transform = tt.Compose(
-        [tt.Resize([200, 200]),
-         tt.ToTensor(),
-         tt.Normalize(*stats)])
+    valid_transform = getattr(config, cfg['valid_transform'])
+    # valid_transform = tt.Compose(
+    #     [tt.Resize([200, 200]),
+    #      tt.ToTensor(),
+    #      tt.Normalize(*stats)])
 
     # Create datasets
     full_dataset = ImageFolder(cfg['data_dir'])
+    print(len(full_dataset))
     classes = full_dataset.classes
     print(classes)
     num_classes = len(classes)
@@ -140,7 +143,6 @@ def main(writer: SummaryWriter, cfg: Dict):
     train_ds.dataset = copy(full_dataset)
     train_ds.dataset.transform = train_transform
     valid_ds.dataset.transform = valid_transform
-
     # test_ds = valid_ds
     train_dl = DeviceDataLoader(
         DataLoader(train_ds,
@@ -149,16 +151,17 @@ def main(writer: SummaryWriter, cfg: Dict):
                    num_workers=3,
                    pin_memory=True), cfg['device'])
     valid_dl = DeviceDataLoader(
-        DataLoader(valid_ds, batch_size * 2, num_workers=2, pin_memory=True),
+        DataLoader(valid_ds, batch_size, num_workers=2, pin_memory=True),
         cfg['device'])
 
-    # show_batch(train_dl)
+    show_batch(train_dl)
 
     # model
     start_epoch = 0
-    model = getattr(net, cfg['model'])
-    model = to_device(WeatherModel1(num_classes, cfg['pretrained_model']),
-                      cfg['device'])
+    # model = getattr(net, cfg['model'])
+    # model = to_device(model(num_classes, cfg['pretrained_model']),
+    #                   cfg['device'])
+    model = create_model(cfg, num_classes)
     if cfg['freeze']:
         model.freeze()
     if cfg['ckpt']:
@@ -189,31 +192,31 @@ def main(writer: SummaryWriter, cfg: Dict):
                              opt_func=opt_func)
 
     # plot accuracy
-    accuracies = [x['val_acc'] for x in history]
-    plt.plot(accuracies, '-x')
-    plt.xlabel('epoch')
-    plt.ylabel('accuracy')
-    plt.title('Accuracy vs. No. of epochs')
-    plt.show()
+    # accuracies = [x['val_acc'] for x in history]
+    # plt.plot(accuracies, '-x')
+    # plt.xlabel('epoch')
+    # plt.ylabel('accuracy')
+    # plt.title('Accuracy vs. No. of epochs')
+    # plt.show()
 
-    # plot losses
-    train_losses = [x.get('train_loss') for x in history]
-    val_losses = [x['val_loss'] for x in history]
-    plt.plot(train_losses, '-bx')
-    plt.plot(val_losses, '-rx')
-    plt.xlabel('epoch')
-    plt.ylabel('loss')
-    plt.legend(['Training', 'Validation'])
-    plt.title('Loss vs. No. of epochs')
-    plt.show()
+    # # plot losses
+    # train_losses = [x.get('train_loss') for x in history]
+    # val_losses = [x['val_loss'] for x in history]
+    # plt.plot(train_losses, '-bx')
+    # plt.plot(val_losses, '-rx')
+    # plt.xlabel('epoch')
+    # plt.ylabel('loss')
+    # plt.legend(['Training', 'Validation'])
+    # plt.title('Loss vs. No. of epochs')
+    # plt.show()
 
-    # plor learning rates
-    lrs = np.concatenate([x.get('lrs', []) for x in history])
-    plt.plot(lrs)
-    plt.xlabel('Batch no.')
-    plt.ylabel('Learning rate')
-    plt.title('Learning Rate vs. Batch no.')
-    plt.show()
+    # # plor learning rates
+    # lrs = np.concatenate([x.get('lrs', []) for x in history])
+    # plt.plot(lrs)
+    # plt.xlabel('Batch no.')
+    # plt.ylabel('Learning rate')
+    # plt.title('Learning Rate vs. Batch no.')
+    # plt.show()
 
     torch.save(model.state_dict(), os.path.join(writer.logdir, 'model.ckpt'))
 
@@ -221,11 +224,13 @@ def main(writer: SummaryWriter, cfg: Dict):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--cfg', type=str, default='res34')
-    parser.add_argument('--gpu', type=str, default='1')
+    parser.add_argument('--gpu', type=str, default=None)
     parser.add_argument('--ckpt', type=str, default=None)
     parser.add_argument('--seed', type=int, default=1)
     args = parser.parse_args()
 
+    if args.gpu is not None:
+        os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     # os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >tmp')
     # memory_gpu = [int(x.split()[2]) for x in open('tmp', 'r').readlines()]
     # os.environ['CUDA_VISIBLE_DEVICES'] = str(np.argmax(memory_gpu))
@@ -250,12 +255,17 @@ if __name__ == '__main__':
     torch.cuda.manual_seed(args.seed)
 
     cfg = getattr(config, args.cfg)
+    # if cfg['pretrained_model'] == 'efficientnet_b3a':
+    #     cfg['batch_size'] = 32
+    # elif cfg['pretrained_model'] in ['regnetx_016', 'regnetx_032']:
+    #     cfg['batch_size'] = 128
     try:
         tuner_params = nni.get_next_parameter()
         # cfg = vars(merge_parameter(cfg, tuner_params))
         cfg.update(tuner_params)
         cfg['device'] = get_default_device()
-        cfg['exp_id'] = f'exp-{cfg["pretrained_model"]}_e{cfg["epochs"]}_b{cfg["batch_size"]}_{cfg["train_transform"]}_explr_{cfg["model"]}_{"freeze" if cfg["freeze"] else "unfreeze"}'
+        if cfg.get('exp_id', None) is None:
+            cfg['exp_id'] = f'exp-{cfg["pretrained_model"]}_e{cfg["epochs"]}_b{cfg["batch_size"]}_{cfg["train_transform"]}_{cfg["valid_transform"]}_explr_{cfg["model"]}_{"freeze" if cfg["freeze"] else "unfreeze"}'
         cfg['ckpt'] = args.ckpt
 
         exps_root = 'runs'

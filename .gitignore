@@ -1,6 +1,7 @@
 data
 runs
-nohup.out
+*.out
+*tmp
 
 .pytest_cache
 .vscode

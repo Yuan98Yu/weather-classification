@@ -2,6 +2,7 @@
     "batch_size": {
         "_type": "choice",
         "_value": [
+            64,
             128,
             256
         ]
@@ -11,6 +12,13 @@
         "_value": [
             true,
             false
+        ]
+    },
+    "model": {
+        "_type": "choice",
+        "_value": [
+            "WeatherModel1",
+            "WeatherModel2"
         ]
     }
 }

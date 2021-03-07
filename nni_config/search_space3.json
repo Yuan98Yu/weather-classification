@@ -1,0 +1,10 @@
+{
+    "pretrained_model": {
+        "_type": "choice",
+        "_value": [
+            "regnetx_016",
+            "regnetx_032",
+            "efficientnet_b3a"
+        ]
+    }
+}

@@ -1,24 +1,25 @@
 authorName: yy
-experimentName: test_on_different_backbone_from_timm
+experimentName: test_on_different_resolving_power
 trialConcurrency: 4
-maxExecDuration: 12h
+maxExecDuration: 16h
 # maxTrialNum: 4
 # choice: local, remote, pai
 trainingServicePlatform: local
 localConfig:
   useActiveGpu: true
   maxTrialNumPerGpu: 1
-searchSpacePath: ./search_space3.json
+searchSpacePath: ./search_space_resolving.json
 #choice: true, false
 useAnnotation: false
 tuner:
   #choice: TPE, Random, Anneal, Evolution, BatchTuner, MetisTuner, GPTuner
   #SMAC (SMAC should be installed through nnictl)
-  builtinTunerName: TPE
-  classArgs:
-    #choice: maximize, minimize
-    optimize_mode: maximize
+  # builtinTunerName: TPE
+  builtinTunerName: GridSearch
+  # classArgs:
+  #   #choice: maximize, minimize
+  #   optimize_mode: maximize
 trial:
-  command: python train.py --cfg efficientb3a_e81_b32_tt3_vt1_explr_WeatherModel3_freeze --seed 1
+  command: python train.py --cfg resnet34_e121_b128_tt5_vt2_explr_WeatherModel2_freeze --seed 1
   codeDir: ../
   gpuNum: 1

@@ -1,0 +1,15 @@
+{
+    "train_transform": {
+        "_type": "choice",
+        "_value": [
+            "tt5",
+            "tt6"
+        ]
+    },
+    "valid_transform": {
+        "_type": "choice",
+        "_value": [
+            "vt2"
+        ]
+    }
+}
