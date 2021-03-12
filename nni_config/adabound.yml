@@ -1,0 +1,21 @@
+authorName: yy
+experimentName: test_on_adabound
+trialConcurrency: 4
+maxExecDuration: 12h
+# maxTrialNum: 4
+# choice: local, remote, pai
+trainingServicePlatform: local
+localConfig:
+  useActiveGpu: true
+  maxTrialNumPerGpu: 1
+searchSpacePath: ./search_space_classes.json
+#choice: true, false
+useAnnotation: false
+tuner:
+  #choice: TPE, Random, Anneal, Evolution, BatchTuner, MetisTuner, GPTuner
+  #SMAC (SMAC should be installed through nnictl)
+  builtinTunerName: GridSearch
+trial:
+  command: python train.py --cfg efficientnet_b3a_e81_b16_tt7_vt2_explr_timmfc3clf_freeze_classes2_adabound --seed 1
+  codeDir: ../
+  gpuNum: 1

@@ -1,7 +1,17 @@
-# from sklearn import metrics
-import matplotlib.pyplot as plt
-import seaborn as sns
 import torch
+from torchvision.utils import make_grid
+from matplotlib import pyplot as plt
+import seaborn as sns
+
+
+def show_batch(dl):
+    for images, labels in dl:
+        fig, ax = plt.subplots(figsize=(12, 12))
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.imshow(make_grid(images.cpu()[:64], nrow=8).permute(1, 2, 0))
+        plt.show()
+        break
 
 
 def plt_confusion_matrix(outputs, y_true, num_classes):

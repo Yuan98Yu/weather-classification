@@ -9,13 +9,14 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 # import torchvision.transforms as tt
-from torchvision.datasets import ImageFolder
 from tensorboardX import SummaryWriter
 import numpy as np
-# import matplotlib.pyplot as plt
 
-from data import DeviceDataLoader, get_default_device, show_batch
-from net import create_model
+from wcyy.data import DeviceDataLoader, create_full_dataset
+from wcyy.utils.device import get_default_device
+from wcyy.utils.exp import get_exp_ID
+from wcyy.models import create_model
+from wcyy.optim import create_optimizer
 import config
 
 
@@ -119,27 +120,15 @@ def main(writer: SummaryWriter, cfg: Dict):
     batch_size = cfg['batch_size']
 
     train_transform = getattr(config, cfg['train_transform'])
-
-    # train_transform = tt.Compose([
-    #     tt.RandomCrop(200, padding=20, padding_mode='reflect'),
-    #     tt.RandomHorizontalFlip(),
-    #     tt.ToTensor(),
-    #     tt.Normalize(*stats)
-    # ])
     valid_transform = getattr(config, cfg['valid_transform'])
-    # valid_transform = tt.Compose(
-    #     [tt.Resize([200, 200]),
-    #      tt.ToTensor(),
-    #      tt.Normalize(*stats)])
 
-    # Create datasets
-    full_dataset = ImageFolder(cfg['data_dir'])
+    full_dataset = create_full_dataset(cfg)
+    print(full_dataset.classes)
+    num_classes = len(full_dataset.classes)
     print(len(full_dataset))
-    classes = full_dataset.classes
-    print(classes)
-    num_classes = len(classes)
+    # classes = full_dataset.classes
     train_ds, valid_ds = torch.utils.data.random_split(full_dataset,
-                                                       [50000, 10000])
+                                                       [len(full_dataset)-10000, 10000])
     train_ds.dataset = copy(full_dataset)
     train_ds.dataset.transform = train_transform
     valid_ds.dataset.transform = valid_transform
@@ -154,13 +143,10 @@ def main(writer: SummaryWriter, cfg: Dict):
         DataLoader(valid_ds, batch_size, num_workers=2, pin_memory=True),
         cfg['device'])
 
-    show_batch(train_dl)
+    # show_batch(train_dl)
 
     # model
     start_epoch = 0
-    # model = getattr(net, cfg['model'])
-    # model = to_device(model(num_classes, cfg['pretrained_model']),
-    #                   cfg['device'])
     model = create_model(cfg, num_classes)
     if cfg['freeze']:
         model.freeze()
@@ -176,7 +162,7 @@ def main(writer: SummaryWriter, cfg: Dict):
     max_lr = cfg['max_lr']
     grad_clip = cfg['grad_clip']
     weight_decay = cfg['weight_decay']
-    opt_func = torch.optim.Adam
+    opt_func = create_optimizer(cfg)
 
     history = [evaluate(model, valid_dl)]
 
@@ -223,7 +209,7 @@ def main(writer: SummaryWriter, cfg: Dict):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--cfg', type=str, default='res34')
+    parser.add_argument('--cfg', type=str)
     parser.add_argument('--gpu', type=str, default=None)
     parser.add_argument('--ckpt', type=str, default=None)
     parser.add_argument('--seed', type=int, default=1)
@@ -231,41 +217,17 @@ if __name__ == '__main__':
 
     if args.gpu is not None:
         os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
-    # os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >tmp')
-    # memory_gpu = [int(x.split()[2]) for x in open('tmp', 'r').readlines()]
-    # os.environ['CUDA_VISIBLE_DEVICES'] = str(np.argmax(memory_gpu))
-    # os.system('rm tmp')
-    # import pynvml
-    # import time
-    # import random
-    # pynvml.nvmlInit()
-    # time.sleep(random.random()*10)
-    # for index in range(pynvml.nvmlDeviceGetCount()):
-    #     # 这里的0是GPU id
-
-    #     handle = pynvml.nvmlDeviceGetHandleByIndex(index)
-    #     meminfo = pynvml.nvmlDeviceGetMemoryInfo(handle)
-    #     used = meminfo.used / meminfo.total
-    #     if used < 0.1:
-    #         os.environ["CUDA_VISIBLE_DEVICES"] = f'{index}'
-    #         break
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
 
     cfg = getattr(config, args.cfg)
-    # if cfg['pretrained_model'] == 'efficientnet_b3a':
-    #     cfg['batch_size'] = 32
-    # elif cfg['pretrained_model'] in ['regnetx_016', 'regnetx_032']:
-    #     cfg['batch_size'] = 128
     try:
         tuner_params = nni.get_next_parameter()
-        # cfg = vars(merge_parameter(cfg, tuner_params))
         cfg.update(tuner_params)
         cfg['device'] = get_default_device()
-        if cfg.get('exp_id', None) is None:
-            cfg['exp_id'] = f'exp-{cfg["pretrained_model"]}_e{cfg["epochs"]}_b{cfg["batch_size"]}_{cfg["train_transform"]}_{cfg["valid_transform"]}_explr_{cfg["model"]}_{"freeze" if cfg["freeze"] else "unfreeze"}'
+        get_exp_ID(cfg)
         cfg['ckpt'] = args.ckpt
 
         exps_root = 'runs'

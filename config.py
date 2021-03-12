@@ -94,6 +94,76 @@ vt2 = tt.Compose([tt.Resize([320, 320]), tt.ToTensor(), tt.Normalize(*stats)])
 vt3 = tt.Compose([tt.Resize([256, 256]), tt.ToTensor(), tt.Normalize(*stats)])
 vt4 = tt.Compose([tt.Resize([400, 400]), tt.ToTensor(), tt.Normalize(*stats)])
 
+classes0 = ['cloudy', 'haze', 'rainy', 'snow', 'sunny', 'thunder']
+classes1 = ['cloudy', 'rainy', 'snow', 'sunny', 'thunder']
+classes2 = ['haze', 'rainy', 'snow', 'sunny', 'thunder']
+classes3 = ['cloudy', 'haze', 'snow', 'sunny', 'thunder']
+
+efficientnet_b3a_e81_b16_tt7_vt2_explr_timmfc3clf_freeze_classes2_adabound = {
+    'data_dir': data_dir,
+    'epochs': 81,
+    'batch_size': 16,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'efficientnet_b3a',
+    'pretrained': True,
+    'train_transform': 'tt7',
+    'valid_transform': 'vt2',
+    'model': 'TimmFC3CLF',
+    'freeze': True,
+    'classes': 'classes2',
+    'opt_func': 'adabound'
+}
+
+efficientnet_b3a_e81_b16_tt7_vt2_explr_WeatherModel3_freeze_classes1 = {
+    'data_dir': data_dir,
+    'epochs': 81,
+    'batch_size': 16,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'efficientnet_b3a',
+    'pretrained': True,
+    'train_transform': 'tt7',
+    'valid_transform': 'vt2',
+    'model': 'WeatherModel3',
+    'freeze': True,
+    'classes': 'classes1'
+}
+
+efficientnet_b3a_e81_b16_tt7_vt2_explr_WeatherModel3_freeze_classes2 = {
+    'data_dir': data_dir,
+    'epochs': 81,
+    'batch_size': 16,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'efficientnet_b3a',
+    'pretrained': True,
+    'train_transform': 'tt7',
+    'valid_transform': 'vt2',
+    'model': 'WeatherModel3',
+    'freeze': True,
+    'classes': 'classes2'
+}
+
+efficientnet_b3a_e81_b16_tt7_vt2_explr_WeatherModel3_freeze_classes3 = {
+    'data_dir': data_dir,
+    'epochs': 81,
+    'batch_size': 16,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'efficientnet_b3a',
+    'pretrained': True,
+    'train_transform': 'tt7',
+    'valid_transform': 'vt2',
+    'model': 'WeatherModel3',
+    'freeze': True,
+    'classes': 'classes3'
+}
+
 efficientnet_b3a_e81_b16_tt7_vt2_explr_WeatherModel3_freeze = {
     'data_dir': data_dir,
     'epochs': 81,
@@ -106,6 +176,21 @@ efficientnet_b3a_e81_b16_tt7_vt2_explr_WeatherModel3_freeze = {
     'train_transform': 'tt7',
     'valid_transform': 'vt2',
     'model': 'WeatherModel3',
+    'freeze': True
+}
+
+efficientnet_b3a_e81_b16_tt7_vt2_explr_WeatherModel5_freeze = {
+    'data_dir': data_dir,
+    'epochs': 81,
+    'batch_size': 16,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'efficientnet_b3a',
+    'pretrained': True,
+    'train_transform': 'tt7',
+    'valid_transform': 'vt2',
+    'model': 'WeatherModel5',
     'freeze': True
 }
 
@@ -152,7 +237,8 @@ efficientnet_b3a_e81_b16_tt5_vt3_explr_WeatherModel3_freeze = {
     'train_transform': 'tt5',
     'valid_transform': 'vt3',
     'model': 'WeatherModel3',
-    'freeze': True
+    'freeze': True,
+    'classes': 'classes0'
 }
 
 resnet34_e121_b128_tt5_vt2_explr_WeatherModel2_freeze = {
