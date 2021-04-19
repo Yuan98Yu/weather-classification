@@ -1,27 +1,30 @@
-import abc
+from typing import Dict
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from tensorboardX import SummaryWriter
 
 from wcyy.metrics import accuracy
+from wcyy.loss import create_loss_func
 
 
 class ImageClassificationBase(nn.Module):
     # @abc.abstractmethod
     # def forward(self, x):
     #     pass
+    def __init__(self, cfg: Dict = None):
+        super().__init__()
+        self.loss_func = create_loss_func(cfg)
 
     def training_step(self, batch):
         images, labels = batch
         out = self(images)  # Generate predictions
-        loss = F.cross_entropy(out, labels)  # Calculate loss
+        loss = self.loss_func(out, labels)  # Calculate loss
         return loss
 
     def validation_step(self, batch):
         images, labels = batch
         out = self(images)  # Generate predictions
-        loss = F.cross_entropy(out, labels)  # Calculate loss
+        loss = self.loss_func(out, labels)  # Calculate loss
         acc = accuracy(out, labels)  # Calculate accuracy
         return {
             'y_pred': out,

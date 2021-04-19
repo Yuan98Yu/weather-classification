@@ -7,8 +7,8 @@ def create_optimizer(cfg):
     if opt_func_name == 'adabound':
         opt_func = adabound.AdaBound
     elif opt_func_name is not None:
-        opt_func = getattr(torch.optim, 'opt_func')
+        opt_func = getattr(torch.optim, opt_func_name)
     else:
         opt_func = torch.optim.Adam
-    
+
     return opt_func

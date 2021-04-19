@@ -1,4 +1,4 @@
-import torch
+from typing import Dict
 from torch import nn
 import torchvision.models as models
 
@@ -10,8 +10,9 @@ class ResFC1CLF(ImageClassificationBase):
     def __init__(self,
                  num_classes=6,
                  pretrained_model='resnet34',
-                 pretrained=True):
-        super().__init__()
+                 pretrained=True,
+                 cfg: Dict = None):
+        super().__init__(cfg)
         # Use a pretrained model
         self.network = getattr(models, pretrained_model)(pretrained=pretrained)
         # Replace last layer
@@ -19,7 +20,7 @@ class ResFC1CLF(ImageClassificationBase):
         self.network.fc = nn.Linear(num_ftrs, num_classes)
 
     def forward(self, xb):
-        return torch.sigmoid(self.network(xb))
+        return self.network(xb)
 
     def freeze(self):
         # To freeze the residual layers
@@ -38,8 +39,9 @@ class ResFC2CLF(ResFC1CLF):
     def __init__(self,
                  num_classes=6,
                  pretrained_model='resnet34',
-                 pretrained=True):
-        super.__init__(num_classes, pretrained_model, pretrained)
+                 pretrained=True,
+                 cfg: Dict = None):
+        super.__init__(num_classes, pretrained_model, pretrained, cfg)
         # # Use a pretrained model
         # self.network = getattr(models, pretrained_model)(pretrained=pretrained)
 
@@ -59,8 +61,9 @@ class Res15FC1CLF(ImageClassificationBase):
     def __init__(self,
                  num_classes,
                  pretrained_model='resnet15',
-                 pretrained=False):
-        super().__init__()
+                 pretrained=False,
+                 cfg: Dict = None):
+        super().__init__(cfg)
         # Use a pretrained model
         self.pretrained_model = pretrained_model
         self.network = resnet15(pretrained=pretrained,

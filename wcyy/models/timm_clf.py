@@ -1,3 +1,5 @@
+from typing import Dict
+
 import timm
 from torch import nn
 
@@ -8,8 +10,9 @@ class TimmFC1CLF(ImageClassificationBase):
     def __init__(self,
                  num_classes,
                  pretrained_model='efficientnet_b3a',
-                 pretrained=True):
-        super().__init__()
+                 pretrained=True,
+                 cfg: Dict = None):
+        super().__init__(cfg)
         # Use a pretrained model
         self.pretrained_model = pretrained_model
         self.network = timm.create_model(pretrained_model,
@@ -48,8 +51,9 @@ class TimmFC3CLF(TimmFC1CLF):
     def __init__(self,
                  num_classes,
                  pretrained_model='efficientnet_b3a',
-                 pretrained=True):
-        super().__init__(num_classes, pretrained_model, pretrained)
+                 pretrained=True,
+                 cfg: Dict = None):
+        super().__init__(num_classes, pretrained_model, pretrained, cfg)
         # # Use a pretrained model
         # self.pretrained_model = pretrained_model
         # self.network = timm.create_model(pretrained_model,

@@ -99,6 +99,26 @@ classes1 = ['cloudy', 'rainy', 'snow', 'sunny', 'thunder']
 classes2 = ['haze', 'rainy', 'snow', 'sunny', 'thunder']
 classes3 = ['cloudy', 'haze', 'snow', 'sunny', 'thunder']
 
+
+efficientnet_b3a_e81_b16_tt7_vt2_explr_timmfc3clf_freeze_classes2_Adam_focalloss = {
+    'data_dir': data_dir,
+    'epochs': 81,
+    'batch_size': 16,
+    'max_lr': 3e-4,
+    'grad_clip': 0.1,
+    'weight_decay': 1e-4,
+    'pretrained_model': 'efficientnet_b3a',
+    'pretrained': True,
+    'train_transform': 'tt7',
+    'valid_transform': 'vt2',
+    'model': 'TimmFC3CLF',
+    'freeze': True,
+    'classes': 'classes2',
+    'opt_func': 'Adam',
+    'loss_func': 'focalloss'
+}
+
+
 efficientnet_b3a_e81_b16_tt7_vt2_explr_timmfc3clf_freeze_classes2_adabound = {
     'data_dir': data_dir,
     'epochs': 81,
