@@ -210,11 +210,13 @@ efficientnet_b3a_e81_b16_tt7_vt2_explr_WeatherModel5_freeze = {
     'pretrained': True,
     'train_transform': 'tt7',
     'valid_transform': 'vt2',
-    'model': 'WeatherModel5',
-    'freeze': True
+    'model': 'TimmFC3CLF',
+    'freeze': True,
+    'classes': 'classes0'
 }
 
 efficientnet_b3a_e81_b16_tt8_vt2_explr_WeatherModel3_freeze = {
+    'exp-id': 'efficientnet_b3a_e81_b16_tt8_vt2_explr_WeatherModel3_freeze',
     'data_dir': data_dir,
     'epochs': 81,
     'batch_size': 16,

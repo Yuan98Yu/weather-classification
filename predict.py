@@ -6,13 +6,24 @@ from collections import defaultdict
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-import torchvision.transforms as tt
 from tensorboardX import SummaryWriter
 
 from wcyy.data import create_full_dataset
-from wcyy.models import create_model, DeviceDataLoader
+from wcyy.models import create_model
+from wcyy.data import DeviceDataLoader
 from wcyy.utils.device import to_device, get_default_device
 import config
+
+
+@torch.no_grad()
+def predict_img(model, img, transform, device):
+    model = model.to(device)
+    model.eval()
+    img = torch.unsqueeze(transform(img), 0).to(device)
+    out = model(img)
+    # _, indices = torch.sort(out, descending=True)
+    # print(indices)
+    return out
 
 
 def predict_full(args):
@@ -47,7 +58,7 @@ def predict_full(args):
     classes = getattr(config, cfg['classes'])
     print(classes)
     num_classes = len(classes)
-    full_dataset = create_full_dataset(cfg, classes)
+    full_dataset = create_full_dataset(cfg)
     train_ds, valid_ds = torch.utils.data.random_split(
         full_dataset, [len(full_dataset)-10000, 10000])
     train_ds.dataset = copy(full_dataset)
