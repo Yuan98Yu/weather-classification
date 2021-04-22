@@ -1,3 +1,5 @@
+"""使用和风天气 api
+"""
 import requests
 
 default_cfg = {

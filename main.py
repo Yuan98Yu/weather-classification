@@ -1,7 +1,11 @@
 import websockets
+import asyncio
 from argparse import ArgumentParser
 import os
-import time
+import json
+import glob
+from pathlib import Path
+from io import BytesIO
 
 import torch
 from PIL import Image
@@ -11,10 +15,15 @@ from wcyy.models import create_model
 from wcyy.utils.device import to_device, get_default_device
 from predict import predict_img
 from weather_request import get_weather_info, default_cfg
-from camera import get_img
 import config
+from server_config import ws_web_server_url, default_classes, img_save_dir, ws_listen_port, ws_listen_host
 
-default_classes = ['cloudy', 'haze', 'rainy', 'snow', 'sunny', 'thunder']
+
+async def ws_send_data(server_url=ws_web_server_url, data=None):
+    async with websockets.connect(server_url) as websocket:
+        await websocket.send(data)
+        # greeting = await websocket.recv()
+        # print(f"< {greeting}")
 
 
 def weatype2idx(wea_type: str, classes=default_classes):
@@ -107,13 +116,33 @@ def solve_one_img(img, classes, model, transform, device):
     _, indices = torch.sort(out, descending=True)
     print(indices)
     pred_idx = indices[0][0]
-    if classes[pred_idx] in ['cloudy', 'haze'] and wea_type in ['cloudy', 'haze']:
+    if classes[pred_idx] in ['cloudy', 'haze'
+                             ] and wea_type in ['cloudy', 'haze']:
         class2idx = {class_name: i for i, class_name in enumerate(classes)}
         pred_idx = class2idx[wea_type]
     ans['pred'] = classes[pred_idx]
     ans['forecast'] = weather_info
 
     return ans
+
+
+def lazy_solve_when_rec_img(classes, model, valid_transform, device):
+    async def solve_when_rec_img(websocket, path):
+        # rec img
+        data = await websocket.recv()
+        print('rec data!'.center(100, '='))
+        stream = BytesIO(data)
+        img = Image.open(stream).convert('RGB')
+        data = solve_one_img(img, classes, model, valid_transform, device)
+
+        img_idx = len(glob.glob(str(img_save_dir / Path('*.jpg'))))
+        img.save(img_save_dir / Path(f'img_{img_idx}.jpg'))
+        print(data)
+        data = json.dumps(data)
+        # asyncio.get_event_loop().run_until_complete(ws_send_data(data=data))
+        await ws_send_data(data=data)
+
+    return solve_when_rec_img
 
 
 def main():
@@ -165,18 +194,28 @@ def main():
     valid_transform = getattr(config, cfg['valid_transform'])
 
     # main loop
+    solve_when_rec_img = lazy_solve_when_rec_img(classes, model,
+                                                 valid_transform,
+                                                 cfg['device'])
+    start_server = websockets.serve(solve_when_rec_img, ws_listen_host, ws_listen_port)
+
+    asyncio.get_event_loop().run_until_complete(start_server)
+    asyncio.get_event_loop().run_forever()
     # while True:
-    # time.sleep(1)
-    # img = get_img(args.camera_img_url)
-    # result = predict_img(model, img, valid_transform, cfg['device'])
-
-    # websocket
-
-    # test
-    img_path = './data/cloudy/cloudy_00009.jpg'
-    img = pil_loader(img_path)
-    data = solve_one_img(img, classes, model, valid_transform, cfg['device'])
-    print(data)
+    #     time.sleep(10)
+    #     # img = get_img(args.camera_img_url)
+    #     # result = predict_img(model, img, valid_transform, cfg['device'])
+    #     img_path = './data/cloudy/cloudy_00009.jpg'
+    #     img = pil_loader(img_path)
+    #     data = solve_one_img(img, classes, model, valid_transform, cfg['device'])
+    #     # img_byte = base64.b64encode(img.tobytes)
+    #     # img_str = img_byte.decode('ascii')
+    #     img_idx = len(glob.glob(str(img_save_dir / Path('*.jpg'))))
+    #     img.save(img_save_dir / Path(f'img_{img_idx}.jpg'))
+    #     print(data)
+    #     data = json.dumps(data)
+    #     asyncio.get_event_loop().run_until_complete(ws_send_data(data=data))
+    #     break
 
 
 if __name__ == '__main__':

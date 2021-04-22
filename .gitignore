@@ -4,6 +4,8 @@
 
 *.out
 *tmp
+*.jpg
+*.png
 
 .pytest_cache
 .vscode
